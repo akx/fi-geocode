@@ -1,6 +1,6 @@
-geo3.db: data/Finland_addresses_2020-11-13.csv data/municipalities.csv mkdb.sh
+geo3.db: data/Finland_addresses_2020-11-13.csv data/municipalities.csv create_database.py
 	rm -f "$@"
-	./mkdb.sh "$@"
+	python3 create_database.py "$@"
 
 data/Finland_addresses_2020-11-13.csv: data/finland_addresses_2020-11-13_json.7z
 	7z x "$<" data/Finland_addresses_2020-11-13.csv -so | iconv -f ISO-8859-15 -t UTF-8 > "$@"

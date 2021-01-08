@@ -5,7 +5,7 @@ import sys
 
 fi_addr_re = re.compile(r"([-:a-zåäö ]+)\s(\d+)$", flags=re.IGNORECASE | re.UNICODE)
 
-geodb = sqlite3.connect("geo3.db")
+geodb = sqlite3.connect("geo4.db")
 geodb.row_factory = sqlite3.Row
 
 def get_candidate_addresses(line):
@@ -39,17 +39,19 @@ for line in lines:
             cur = geodb.cursor()
             if fuzzy_house:
                 cur.execute(
-                    "SELECT * FROM addr "
-                    "LEFT JOIN mun on (addr.municipality = mun.code) "
-                    "WHERE mun.name = ? AND addr.street = ? AND addr.house_number LIKE ? COLLATE NOCASE "
+                    "SELECT *, s.name as s_name, m.name as m_name FROM buildings b "
+                    "LEFT JOIN municipalities m on b.municipality_code = m.code "
+                    "LEFT JOIN streets s on b.street_id = s.id "
+                    "WHERE m.name = ? AND s.name = ? AND b.house_number LIKE ? COLLATE NOCASE "
                     "LIMIT 1",
                     (city, street, f'{bldg}%'),
                 )
             else:
                 cur.execute(
-                    "SELECT * FROM addr "
-                    "LEFT JOIN mun on (addr.municipality = mun.code) "
-                    "WHERE mun.name = ? AND addr.street = ? AND addr.house_number = ? COLLATE NOCASE "
+                    "SELECT *, s.name as s_name, m.name as m_name FROM buildings b "
+                    "LEFT JOIN municipalities m on b.municipality_code = m.code "
+                    "LEFT JOIN streets s on b.street_id = s.id "
+                    "WHERE m.name = ? AND s.name = ? AND b.house_number = ? COLLATE NOCASE "
                     "LIMIT 1",
                     (city, street, bldg),
                 )
