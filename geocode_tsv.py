@@ -1,12 +1,11 @@
-import sqlite3
 import csv
 import re
 import sys
 
+from geodb import GeoDB
+
 fi_addr_re = re.compile(r"([-:a-zåäö ]+)\s(\d+)$", flags=re.IGNORECASE | re.UNICODE)
 
-geodb = sqlite3.connect("geo4.db")
-geodb.row_factory = sqlite3.Row
 
 def get_candidate_addresses(line):
     city = line["Kaupunki"]
@@ -23,12 +22,7 @@ def get_candidate_addresses(line):
     yield (city, street, bldg)
 
 
-
-with open("a.tsv", "r") as f:
-    df = csv.DictReader(f, dialect=csv.excel_tab)
-    lines = list(df)
-
-for line in lines:
+def get_matches(geodb, line):
     matches = []
     for fuzzy_house in (False, True):
         if matches:
@@ -36,31 +30,33 @@ for line in lines:
         for city, street, bldg in get_candidate_addresses(line):
             street = street.strip()
             bldg = bldg.strip()
-            cur = geodb.cursor()
-            if fuzzy_house:
-                cur.execute(
-                    "SELECT *, s.name as s_name, m.name as m_name FROM buildings b "
-                    "LEFT JOIN municipalities m on b.municipality_code = m.code "
-                    "LEFT JOIN streets s on b.street_id = s.id "
-                    "WHERE m.name = ? AND s.name = ? AND b.house_number LIKE ? COLLATE NOCASE "
-                    "LIMIT 1",
-                    (city, street, f'{bldg}%'),
-                )
-            else:
-                cur.execute(
-                    "SELECT *, s.name as s_name, m.name as m_name FROM buildings b "
-                    "LEFT JOIN municipalities m on b.municipality_code = m.code "
-                    "LEFT JOIN streets s on b.street_id = s.id "
-                    "WHERE m.name = ? AND s.name = ? AND b.house_number = ? COLLATE NOCASE "
-                    "LIMIT 1",
-                    (city, street, bldg),
-                )
-            row = cur.fetchone()
+            row = geodb.query(
+                city_name=city,
+                street_name=street,
+                house_number=bldg,
+                fuzzy=fuzzy_house,
+            )
             if row:
                 matches.append({**dict(row), "fuzzy": fuzzy_house})
-    if not matches:
-        print((line["Nimi"], line["Osoite"], line["Kaupunki"]), file=sys.stderr)
-        print("-", "-", sep="\t")
-    else:
-        m = matches[0]
-        print(m["longitude_wgs84"], m["latitude_wgs84"], sep="\t")
+    return matches
+
+
+def main():
+    geodb = GeoDB.from_file("geo4.db")
+
+    with open("a.tsv", "r") as f:
+        df = csv.DictReader(f, dialect=csv.excel_tab)
+        lines = list(df)
+
+    for line in lines:
+        matches = get_matches(geodb, line)
+        if not matches:
+            print((line["Nimi"], line["Osoite"], line["Kaupunki"]), file=sys.stderr)
+            print("-", "-", sep="\t")
+        else:
+            m = matches[0]
+            print(m["longitude_wgs84"], m["latitude_wgs84"], sep="\t")
+
+
+if __name__ == '__main__':
+    main()
